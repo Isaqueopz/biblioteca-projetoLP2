@@ -25,7 +25,6 @@ public class ItemDoAcervo {
     }
   }
 
-
   //GETTERS
   public String getTitulo() {
     return titulo;
@@ -36,6 +35,11 @@ public class ItemDoAcervo {
   public int getAno() {
     return ano;
   }
+  public int getPrazo() {
+    return 7;
+  }
+  public double getValorMultaPorDia() {return 0.50;}
+
 
   public ItemDoAcervo(String titulo, int ano) {
     setTitulo(titulo);

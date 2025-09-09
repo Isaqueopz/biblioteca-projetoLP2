@@ -14,6 +14,16 @@ public class Livro extends ItemDoAcervo {
     return autor;
   }
 
+  @Override
+  public int getPrazo() {
+    return 14;
+  }
+
+  @Override
+  public double getValorMultaPorDia(){
+    return 0.75;
+  }
+
   //Construtor
   public Livro(String titulo, String autor, int ano){
     super(titulo,ano);

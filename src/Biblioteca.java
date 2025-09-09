@@ -10,8 +10,6 @@ public class Biblioteca {
   private List<ItemDoAcervo> acervo;
   private List<Usuario> listaDeUsuarios;
   private List<Emprestimo> registroDeEmprestimos;
-  private static final int PRAZO_EMPRESTIMO_DIAS = 14;
-  private static final double VALOR_MULTA_POR_DIA = 0.75;
 
   public Biblioteca() {
     this.acervo = new ArrayList<>();
@@ -22,48 +20,44 @@ public class Biblioteca {
   // ------------------ BUSINESS LOGIC ------------------
 
   public boolean realizarEmprestimo(String idUsuario, String titulo) {
-    Usuario usuarioDoEmprestimo = pesquisarUsuarioPorId(idUsuario)
-      .orElse(null);
-
-    if (usuarioDoEmprestimo == null) {
+    Optional<Usuario> usuarioOpt = pesquisarUsuarioPorId(idUsuario);
+    if (usuarioOpt.isEmpty()) {
       System.out.println("Error: this user is not registered.");
       return false;
     }
+    Usuario usuario = usuarioOpt.get();
 
-    Optional<Livro> livroOpt = pesquisarLivroPorTitulo(titulo);
-    if (livroOpt.isEmpty()) {
-      System.out.println("Error: this book is not registered.");
+    Optional<ItemDoAcervo> itemOpt = pesquisarItemPorTitulo(titulo);
+    if (itemOpt.isEmpty()) {
+      System.out.println("Error: this item is not registered.");
+      return false;
+    }
+    ItemDoAcervo item = itemOpt.get();
+
+    if (!itemDisponivel(item)) {
+      System.out.println("Error: this item is already loaned.");
       return false;
     }
 
-    Livro livro = livroOpt.get();
-
-    if (!livroDisponivel(livro)) {
-      System.out.println("Error: this book is already loaned.");
-      return false;
-    }
-
-    livro.setStatus(StatusLivro.EMPRESTADO);
+    item.setStatus(StatusLivro.EMPRESTADO); // ou StatusItem se generalizar
     LocalDate hoje = LocalDate.now();
-    LocalDate devolucaoPrevista = hoje.plusDays(PRAZO_EMPRESTIMO_DIAS);
-    Emprestimo emprestimo = new Emprestimo(livro, usuarioDoEmprestimo, hoje, devolucaoPrevista);
+    LocalDate devolucaoPrevista = hoje.plusDays(item.getPrazo()); // usar prazo do item
+    Emprestimo emprestimo = new Emprestimo(item, usuario, hoje, devolucaoPrevista);
     registroDeEmprestimos.add(emprestimo);
 
     System.out.println("Loan successfully registered.");
     return true;
   }
 
-  private boolean livroDisponivel(Livro livro) {
-    return livro.getStatus() == StatusLivro.DISPONIVEL;
+  private boolean itemDisponivel(ItemDoAcervo item) {
+    return item.getStatus() == StatusLivro.DISPONIVEL;
   }
 
-  // ------------------ SEARCHES ------------------ //
+  // ------------------ SEARCHES ------------------
 
-  public Optional<Livro> pesquisarLivroPorTitulo(String titulo) {
+  public Optional<ItemDoAcervo> pesquisarItemPorTitulo(String titulo) {
     return acervo.stream()
-      .filter(item -> item instanceof Livro)
-      .map(item -> (Livro) item)
-      .filter(l -> l.getTitulo().equalsIgnoreCase(titulo))
+      .filter(i -> i.getTitulo().equalsIgnoreCase(titulo))
       .findFirst();
   }
 
@@ -73,26 +67,22 @@ public class Biblioteca {
       .findFirst();
   }
 
-  public Emprestimo buscarEmprestimoAtivoPorLivro(Livro livro) {
-    for (Emprestimo emprestimo : registroDeEmprestimos) {
-      if (emprestimo.getItem().getTitulo().equalsIgnoreCase(livro.getTitulo())) {
-        if (emprestimo.getDataDevolucaoReal() == null) {
-          return emprestimo;
-        }
-      }
-    }
-    return null;
+  public Emprestimo buscarEmprestimoAtivoPorItem(ItemDoAcervo item) {
+    return registroDeEmprestimos.stream()
+      .filter(e -> e.getItem().equals(item) && e.getDataDevolucaoReal() == null)
+      .findFirst()
+      .orElse(null);
   }
 
-  // ------------------ REGISTRATIONS ------------------ //
+  // ------------------ REGISTRATIONS ------------------
 
   public boolean cadastrarItem(ItemDoAcervo item) {
     if (acervo.contains(item)) {
       System.out.println("Esse item já está no acervo.");
       return false;
     }
-    this.acervo.add(item);
-    System.out.println("Livro \"" + item.getTitulo() + "\" adicionado no acervo.");
+    acervo.add(item);
+    System.out.println("Item \"" + item.getTitulo() + "\" adicionado no acervo.");
     return true;
   }
 
@@ -107,24 +97,24 @@ public class Biblioteca {
   }
 
   public void listarAcervo() {
-    System.out.println("\n📚 Books in the Collection:");
+    System.out.println("\n📚 Items in the Collection:");
     if (acervo.isEmpty()) {
-      System.out.println("No books registered.");
+      System.out.println("No items registered.");
     } else {
       acervo.forEach(System.out::println);
     }
   }
 
   public void realizarDevolucao(String titulo) {
-    Optional<Livro> livroOpt = pesquisarLivroPorTitulo(titulo);
+    Optional<ItemDoAcervo> itemOpt = pesquisarItemPorTitulo(titulo);
 
-    if (livroOpt.isEmpty()) {
-      System.out.println("Error: this book is not registered.");
+    if (itemOpt.isEmpty()) {
+      System.out.println("Error: this item is not registered.");
       return;
     }
 
-    Livro livro = livroOpt.get();
-    Emprestimo emprestimo = buscarEmprestimoAtivoPorLivro(livro);
+    ItemDoAcervo item = itemOpt.get();
+    Emprestimo emprestimo = buscarEmprestimoAtivoPorItem(item);
 
     if (emprestimo == null) {
       System.out.println("Error: this loan does not exist.");
@@ -135,107 +125,98 @@ public class Biblioteca {
     long diasAtraso = ChronoUnit.DAYS.between(emprestimo.getDataDevolucaoPrevista(), hoje);
 
     if (diasAtraso > 0) {
-      double multa = diasAtraso * VALOR_MULTA_POR_DIA;
-      System.out.println("Book returned. You need to pay a fine of R$" + multa);
+      double multa = diasAtraso * item.getValorMultaPorDia();
+      System.out.println("Item returned. You need to pay a fine of R$" + multa);
     } else {
-      System.out.println("Book returned.");
+      System.out.println("Item returned.");
     }
 
-    emprestimo.getItem().setStatus(StatusLivro.DISPONIVEL);
+    item.setStatus(StatusLivro.DISPONIVEL);
     emprestimo.setDataDevolucaoReal(hoje);
   }
 
-  // ------------------ MAIN ------------------ //
+  // ------------------ MAIN ------------------
 
   public static void main(String[] args) {
     Scanner sc = new Scanner(System.in);
     boolean opcao_exit = false;
-    Biblioteca library_01 = new Biblioteca();
+    Biblioteca library = new Biblioteca();
 
     while (!opcao_exit) {
       System.out.println("\n================Library================\n");
       System.out.println("Welcome to the central library system!\n");
       System.out.println("Please choose an option:\n");
-      System.out.println("[1] REGISTER A NEW BOOK");
+      System.out.println("[1] REGISTER A NEW ITEM");
       System.out.println("[2] REGISTER A NEW USER");
-      System.out.println("[3] SEARCH BOOKS");
+      System.out.println("[3] SEARCH ITEMS");
       System.out.println("[4] MAKE A LOAN");
       System.out.println("[5] VIEW LIBRARY COLLECTION");
-      System.out.println("[6] RETURN A BOOK");
+      System.out.println("[6] RETURN AN ITEM");
       System.out.println("[7] EXIT MENU");
       int opcao = sc.nextInt();
       sc.nextLine();
 
       switch (opcao) {
         case 1:
-          System.out.println("Enter the name of the book:");
-          String nameBook = sc.nextLine();
-
-          System.out.println("Enter the author's name:");
-          String authorName = sc.nextLine();
-
-          System.out.println("Enter the year of the book:");
-          int yearBook = sc.nextInt();
+          System.out.println("Enter the title of the item:");
+          String titulo = sc.nextLine();
+          System.out.println("Enter the author/creator:");
+          String autor = sc.nextLine();
+          System.out.println("Enter the year:");
+          int ano = sc.nextInt();
           sc.nextLine();
 
-          boolean exists = library_01.acervo.stream()
-            .filter(item -> item instanceof Livro)
-            .map(item -> (Livro) item)
-            .anyMatch(l -> l.getTitulo().equalsIgnoreCase(nameBook)
-              && l.getAutor().equalsIgnoreCase(authorName));
+          boolean exists = library.acervo.stream()
+            .anyMatch(i -> i.getTitulo().equalsIgnoreCase(titulo) && i.getTitulo().equalsIgnoreCase(autor));
 
           if (exists) {
-            System.out.println("This book is already registered in the library.");
+            System.out.println("This item is already registered.");
           } else {
-            library_01.cadastrarItem(new Livro(nameBook, authorName, yearBook));
-            System.out.println("Book successfully registered!");
+            library.cadastrarItem(new Livro(titulo, autor, ano)); // ainda pode ser Livro, DVD etc.
+            System.out.println("Item successfully registered!");
           }
           break;
 
         case 2:
           System.out.println("Enter the name of the user:");
-          String nameUser = sc.nextLine();
+          String nomeUser = sc.nextLine();
           System.out.println("Enter the user ID:");
           String idUser = sc.nextLine();
 
-          boolean user_exists = library_01.listaDeUsuarios.stream()
-            .anyMatch(n -> n.getName().equalsIgnoreCase(nameUser));
+          boolean userExists = library.listaDeUsuarios.stream()
+            .anyMatch(u -> u.getName().equalsIgnoreCase(nomeUser));
 
-          if (user_exists) {
-            System.out.println("This user is already registered in the library.");
+          if (userExists) {
+            System.out.println("This user is already registered.");
           } else {
-            library_01.cadastrarUsuario(new Usuario(nameUser, idUser));
+            library.cadastrarUsuario(new Usuario(nomeUser, idUser));
             System.out.println("User successfully registered!");
           }
           break;
 
         case 3:
           System.out.println("Enter the title to search:");
-          String titleSearch = sc.nextLine();
-          Optional<Livro> found = library_01.pesquisarLivroPorTitulo(titleSearch);
-          if (found.isPresent()) {
-            System.out.println("Book found:\n" + found.get());
-          } else {
-            System.out.println("Book not found.");
-          }
+          String searchTitle = sc.nextLine();
+          Optional<ItemDoAcervo> found = library.pesquisarItemPorTitulo(searchTitle);
+          System.out.println(found.map(i -> "Item found:\n" + i).orElse("Item not found."));
           break;
 
         case 4:
           System.out.println("Enter the user ID:");
           String userIdLoan = sc.nextLine();
-          System.out.println("Enter the book title:");
-          String bookTitleLoan = sc.nextLine();
-          library_01.realizarEmprestimo(userIdLoan, bookTitleLoan);
+          System.out.println("Enter the item title:");
+          String itemTitleLoan = sc.nextLine();
+          library.realizarEmprestimo(userIdLoan, itemTitleLoan);
           break;
 
         case 5:
-          library_01.listarAcervo();
+          library.listarAcervo();
           break;
 
         case 6:
-          System.out.println("Enter the title of the book to return:");
+          System.out.println("Enter the title of the item to return:");
           String titleToReturn = sc.nextLine();
-          library_01.realizarDevolucao(titleToReturn);
+          library.realizarDevolucao(titleToReturn);
           break;
 
         case 7:

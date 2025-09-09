@@ -9,6 +9,16 @@ public class Revista extends ItemDoAcervo{
   }
 
   @Override
+  public int getPrazo() {
+    return 7;
+  }
+
+  @Override
+  public double getValorMultaPorDia() {
+    return 1;
+  }
+
+  @Override
   public String toString() {
     return "Revista{" +
       "ano=" + getAno() + '\'' +
