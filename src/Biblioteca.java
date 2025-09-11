@@ -1,3 +1,12 @@
+// Vale salientar que muita coisa do código está diferente do senhor, entretanto toda a lógica do código do senhor, está aqui!
+//Resposta ex:0:
+//
+//   Com a classe 'ItemDoAcervo', o código funcionaria, criando um objeto "genérico",
+//   mas este objeto seria incompleto, não tendo atributos específicos como 'autor' (de Livro),
+//   isso levaria a inconsistências e possíveis erros na lógica de negócio, como no cálculo de prazos e multas.
+//
+//   No mundo real, um item de uma biblioteca é sempre algo específico, um Livro, uma Revista, um DVD, etc.
+
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -10,6 +19,21 @@ public class Biblioteca {
   private List<ItemDoAcervo> acervo;
   private List<Usuario> listaDeUsuarios;
   private List<Emprestimo> registroDeEmprestimos;
+  public List<ItemDoAcervo> buscar(String termo) {
+    String termoBusca = termo.toLowerCase();
+    return acervo.stream().filter(item -> {
+      boolean tituloContemTermo = item.getTitulo().toLowerCase().contains(termoBusca);
+      if (tituloContemTermo) {
+        return true;
+      }
+      if (item instanceof Livro) {
+        Livro livro = (Livro) item;
+        boolean autorContemTermo = livro.getAutor().toLowerCase().contains(termoBusca);
+        return autorContemTermo;
+      }
+      return false;
+    }).toList();
+  }
 
   public Biblioteca() {
     this.acervo = new ArrayList<>();
@@ -45,7 +69,8 @@ public class Biblioteca {
     Emprestimo emprestimo = new Emprestimo(item, usuario, hoje, devolucaoPrevista);
     registroDeEmprestimos.add(emprestimo);
 
-    System.out.println("Loan successfully registered.");
+    System.out.println("Loan successfully registered. " + "Expected return date: " + devolucaoPrevista);
+
     return true;
   }
 
@@ -158,22 +183,78 @@ public class Biblioteca {
 
       switch (opcao) {
         case 1:
-          System.out.println("Enter the title of the item:");
-          String titulo = sc.nextLine();
-          System.out.println("Enter the author/creator:");
-          String autor = sc.nextLine();
-          System.out.println("Enter the year:");
-          int ano = sc.nextInt();
+          System.out.println("\nQual tipo de item deseja cadastrar?");
+          System.out.println("[1] Livro");
+          System.out.println("[2] DVD");
+          System.out.println("[3] Revista");
+          int tipoItem = sc.nextInt();
           sc.nextLine();
 
-          boolean exists = library.acervo.stream()
-            .anyMatch(i -> i.getTitulo().equalsIgnoreCase(titulo) && i.getTitulo().equalsIgnoreCase(autor));
+          ItemDoAcervo novoItem = null;
 
-          if (exists) {
-            System.out.println("This item is already registered.");
-          } else {
-            library.cadastrarItem(new Livro(titulo, autor, ano)); // ainda pode ser Livro, DVD etc.
-            System.out.println("Item successfully registered!");
+
+
+          switch (tipoItem) {
+            case 1: {
+              System.out.println("--- Cadastro de Livro ---");
+              System.out.println("Digite o título:");
+              String tituloLivro = sc.nextLine();
+              System.out.println("Digite o autor:");
+              String autorLivro = sc.nextLine();
+              System.out.println("Digite o ano:");
+              int anoLivro = sc.nextInt();
+              sc.nextLine();
+
+
+              novoItem = new Livro(tituloLivro, autorLivro, anoLivro);
+              break;
+            }
+            case 2: {
+              System.out.println("--- Cadastro de DVD ---");
+              System.out.println("Digite o título:");
+              String tituloDvd = sc.nextLine();
+              System.out.println("Digite a duração em minutos:");
+              int duracaoDvd = sc.nextInt();
+              sc.nextLine();
+              System.out.println("Digite o ano:");
+              int anoDvd = sc.nextInt();
+              sc.nextLine();
+
+
+              novoItem = new DVD(tituloDvd, anoDvd, duracaoDvd);
+              break;
+            }
+            case 3: {
+              System.out.println("--- Cadastro de Revista ---");
+              System.out.println("Digite o título:");
+              String tituloRevista = sc.nextLine();
+              System.out.println("Digite a edição:");
+              int edicaoRevista = sc.nextInt();
+              sc.nextLine();
+              System.out.println("Digite o ano:");
+              int anoRevista = sc.nextInt();
+              sc.nextLine();
+
+
+              novoItem = new Revista(tituloRevista, anoRevista, edicaoRevista);
+              break;
+            }
+            default:
+              System.out.println("Opção de item inválida.");
+              break;
+          }
+
+
+          if (novoItem != null) {
+            ItemDoAcervo finalNovoItem = novoItem;
+            boolean exists = library.acervo.stream()
+              .anyMatch(i -> i.getTitulo().equalsIgnoreCase(finalNovoItem.getTitulo()));
+
+            if (exists) {
+              System.out.println("Erro: Um item com este título já está cadastrado.");
+            } else {
+              library.cadastrarItem(novoItem);
+            }
           }
           break;
 
@@ -195,10 +276,15 @@ public class Biblioteca {
           break;
 
         case 3:
-          System.out.println("Enter the title to search:");
-          String searchTitle = sc.nextLine();
-          Optional<ItemDoAcervo> found = library.pesquisarItemPorTitulo(searchTitle);
-          System.out.println(found.map(i -> "Item found:\n" + i).orElse("Item not found."));
+          System.out.println("Digite o termo para buscar (título ou autor):");
+          String termo = sc.nextLine();
+          List<ItemDoAcervo> resultados = library.buscar(termo);
+          if (resultados.isEmpty()) {
+            System.out.println("Nenhum item encontrado com o termo '" + termo + "'.");
+          } else {
+            System.out.println("\nResultados da busca (" + resultados.size() + " encontrados):");
+            resultados.forEach(System.out::println);
+          }
           break;
 
         case 4:
